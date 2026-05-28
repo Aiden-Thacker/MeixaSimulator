@@ -1,34 +1,58 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class PlayerCam : MonoBehaviour
 {
+    [Header("Sensitivity")]
     public float senX;
     public float senY;
 
-    public Transform orientation;
+    [Header("References")]
+    [SerializeField] private Transform orientation;
+
+    [Header("Input")]
+    [SerializeField] private InputActionAsset playerControls;
+    
+    InputAction lookAction;
+    Vector2 lookInput;
 
     float yRotation;
     float xRotation;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    void Awake()
     {
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        lookAction = playerControls.FindActionMap("Player").FindAction("Look");
+
+        lookAction.performed += context => lookInput = context.ReadValue<Vector2>();
+        lookAction.canceled += context => lookInput = Vector2.zero;
+    }
+
+    private void OnEnable()
+    {
+        lookAction.Enable();
+    }
+
+    private void OnDisable()
+    {
+        lookAction.Disable();
     }
 
     // Update is called once per frame
     void Update()
     {
-        float mouseX = Input.GetAxisRaw("Mouse X") * Time.deltaTime * senX;
-        float mouseY = Input.GetAxisRaw("Mouse Y") * Time.deltaTime * senY;
+        float mouseX = lookInput.x * Time.deltaTime * senX;
+        float mouseY = lookInput.y * Time.deltaTime * senY;
 
         yRotation += mouseX;
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
 
-        transform.rotation = Quaternion.Euler(xRotation, yRotation, 0);
+        transform.localRotation = Quaternion.Euler(xRotation, yRotation, 0);
         orientation.rotation = Quaternion.Euler(0, yRotation, 0);
     }
 }
