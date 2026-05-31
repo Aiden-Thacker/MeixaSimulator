@@ -5,7 +5,26 @@ public class PlayerMovement : MonoBehaviour
 {
     [Header("Movement")]
     public float moveSpeed;
-    public float sprintMultipler = 2.0f;
+    public float sprintMultiplier = 2.0f;
+    public float groundDrag;
+    private bool isSprinting;
+
+    [Header("Acceleration")]
+    public float acceleration = 8f;
+    public float deceleration = 10f;
+
+    [SerializeField] private float currentMoveSpeed;
+
+    [Header("Jumping")]
+    public float jumpForce;
+    public float jumpCooldown;
+    public float airMultiplier;
+    [SerializeField] private bool readyToJump;
+
+    [Header("Ground Check")]
+    public float playerHeight;
+    public LayerMask whatIsGround;
+    [SerializeField] private bool isGrounded;
 
     public Transform orientation;
 
@@ -35,6 +54,8 @@ public class PlayerMovement : MonoBehaviour
 
         rb = GetComponent<Rigidbody>();
         rb.freezeRotation = true;
+
+        readyToJump = true;
     }
 
     private void OnEnable()
@@ -53,6 +74,45 @@ public class PlayerMovement : MonoBehaviour
         crouchAction.Disable();
     }
 
+    private void Update()
+    {
+        float debugHeight = playerHeight * 0.5f + 0.2f;
+        Vector3 debugLine = transform.TransformDirection(Vector3.down) * debugHeight;
+
+        isGrounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.2f, whatIsGround);
+        Debug.DrawRay(transform.position, debugLine, Color.red);
+
+        isSprinting = sprintAction.ReadValue<float>() > 0;
+
+        float targetSpeed = moveSpeed * (isSprinting ? sprintMultiplier : 1f);
+
+        if (moveInput.magnitude > 0.1f)
+        {
+            currentMoveSpeed = Mathf.Lerp(currentMoveSpeed, targetSpeed, acceleration * Time.deltaTime);
+        }
+        else
+        {
+            currentMoveSpeed = Mathf.Lerp(currentMoveSpeed, 0f, deceleration * Time.deltaTime);
+        }
+
+        SpeedControl();
+
+        if(isGrounded && readyToJump && jumpAction.ReadValue<float>() > 0)
+        {
+            readyToJump = false;
+            Jump();
+            Invoke(nameof(ResetJump), jumpCooldown);
+        }
+
+        if(isGrounded)
+        {
+            rb.linearDamping = groundDrag;
+        }
+        else
+        {
+            rb.linearDamping = 0f;
+        }
+    }
     // Update is called once per frame
     void FixedUpdate()
     {
@@ -61,19 +121,50 @@ public class PlayerMovement : MonoBehaviour
 
     void HandleMovement()
     {
-        float speedMultipler = sprintAction.ReadValue<float>() > 0 ? sprintMultipler : 1f;
+        float speedMultipler = isSprinting ? sprintMultiplier : 1f;
 
-        float verticalSpeed = moveInput.y * moveSpeed * speedMultipler;
-        float horizontalSpeed = moveInput.x * moveSpeed * speedMultipler;
+        moveDirection = orientation.forward * moveInput.y + orientation.right * moveInput.x;
 
-        Vector3 horizontalMovement = new Vector3(horizontalSpeed, 0f, verticalSpeed);
-        horizontalMovement = transform.rotation * horizontalMovement;
+        if(isGrounded)
+        {
+            rb.AddForce(moveDirection.normalized * currentMoveSpeed * speedMultipler * 10f, ForceMode.Force);
+        }
+        else if(!isGrounded)
+        {
+            rb.AddForce(moveDirection.normalized * currentMoveSpeed * speedMultipler * airMultiplier * 10f, ForceMode.Force);
+        }
 
-        moveDirection.x = horizontalMovement.x;
-        moveDirection.z = horizontalMovement.z;
+        //isMoving = moveInput.y != 0 || moveInput.x != 0;
+    }
 
-        rb.AddForce(moveDirection.normalized, ForceMode.Force);
+    void SpeedControl()
+    {
+        float speedMultipler = isSprinting ? sprintMultiplier : 1f;
 
-        isMoving = moveInput.y != 0 || moveInput.x != 0;
+        Vector3 flatVal = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+
+        float maxSpeed = currentMoveSpeed;
+
+        if(flatVal.magnitude > maxSpeed)
+        {
+            Vector3 limitedVal = flatVal.normalized * maxSpeed;
+            rb.linearVelocity = new Vector3(limitedVal.x, rb.linearVelocity.y, limitedVal.z);
+        }
+    }
+
+    void Jump()
+    {
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+        rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
+    }
+
+    void ResetJump()
+    {
+        readyToJump = true;
+    }
+
+    void Crouch()
+    {
+
     }
 }
