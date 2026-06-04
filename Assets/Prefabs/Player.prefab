@@ -235,6 +235,8 @@ MonoBehaviour:
   acceleration: 1.5
   deceleration: 2
   currentMoveSpeed: 0
+  crouchSpeed: 3.5
+  crouchYScale: 0.5
   jumpForce: 5
   jumpCooldown: 0.5
   airMultiplier: 0.3
