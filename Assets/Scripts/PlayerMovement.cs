@@ -19,6 +19,7 @@ public class PlayerMovement : MonoBehaviour
     [Header("Crouching")]
     public float crouchSpeed;
     public float crouchYScale;
+    public float crouchTransitionSpeed = 10f;
     private float startYScale;
     private bool isCrouching;
 
@@ -55,7 +56,9 @@ public class PlayerMovement : MonoBehaviour
         Air,
         Crouching,
     }
-    private MovementState state;
+    [Header("Player State")]
+    [SerializeField] private MovementState state;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Awake()
     {
@@ -103,18 +106,7 @@ public class PlayerMovement : MonoBehaviour
 
         isCrouching = crouchAction.ReadValue<float>() > 0;
 
-        if (isCrouching)
-        {
-            targetSpeed = crouchSpeed;
-        }
-        else if (isSprinting)
-        {
-            targetSpeed = moveSpeed * sprintMultiplier;
-        }
-        else
-        {
-            targetSpeed = moveSpeed;
-        }
+        StateHandler();
 
         if (moveInput.magnitude > 0.1f)
         {
@@ -163,8 +155,6 @@ public class PlayerMovement : MonoBehaviour
         {
             rb.AddForce(moveDirection.normalized * currentMoveSpeed * airMultiplier * 10f, ForceMode.Force);
         }
-
-        //isMoving = moveInput.y != 0 || moveInput.x != 0;
     }
 
     void SpeedControl()
@@ -193,13 +183,34 @@ public class PlayerMovement : MonoBehaviour
 
     void Crouch()
     {
+        float targetYScale = isCrouching ? crouchYScale : startYScale;
+
+        Vector3 targetScale = new Vector3(transform.localScale.x, targetYScale, transform.localScale.z);
+
+        transform.localScale = Vector3.Lerp(transform.localScale, targetScale, crouchTransitionSpeed * Time.deltaTime);
+    }
+
+    void StateHandler()
+    {
         if (isCrouching)
         {
-            transform.localScale = new Vector3(transform.localScale.x, crouchYScale, transform.localScale.z);
+            state = MovementState.Crouching;
+            targetSpeed = crouchSpeed;
+        }
+        else if (!isGrounded)
+        {
+            state = MovementState.Air;
+            targetSpeed = moveSpeed;
+        }
+        else if (isSprinting)
+        {
+            state = MovementState.Sprinting;
+            targetSpeed = moveSpeed * sprintMultiplier;
         }
         else
         {
-            transform.localScale = new Vector3(transform.localScale.x, startYScale, transform.localScale.z);
+            state = MovementState.Walking;
+            targetSpeed = moveSpeed;
         }
     }
 }
